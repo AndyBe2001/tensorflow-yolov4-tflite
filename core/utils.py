@@ -95,6 +95,14 @@ def load_config(FLAGS):
 
     return STRIDES, ANCHORS, NUM_CLASS, XYSCALE
 
+def load_configv2():
+    STRIDES = np.array(cfg.YOLO.STRIDES)
+    ANCHORS = get_anchors(cfg.YOLO.ANCHORS, False)
+    XYSCALE = cfg.YOLO.XYSCALE
+    NUM_CLASS = len(read_class_names(cfg.YOLO.CLASSES))
+
+    return STRIDES, ANCHORS, NUM_CLASS, XYSCALE
+
 def get_anchors(anchors_path, tiny=False):
     anchors = np.array(anchors_path)
     if tiny:

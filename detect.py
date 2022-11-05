@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
+from tensorflow.compat.v1 import GPUOptions
 
 flags.DEFINE_string('framework', 'tf', '(tf, tflite, trt')
 flags.DEFINE_string('weights', './checkpoints/yolov4-416',
@@ -25,6 +26,9 @@ flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.25, 'score threshold')
 
 def main(_argv):
+    #config = ConfigProto(allow_soft_placement=True)
+    #config.gpu_options = GPUOptions(per_process_gpu_memory_fraction=0.7)
+    #config.gpu_options.allow_growth = True
     config = ConfigProto()
     config.gpu_options.allow_growth = True
     session = InteractiveSession(config=config)
