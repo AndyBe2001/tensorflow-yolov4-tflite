@@ -18,14 +18,11 @@ from tkinter import (
     IntVar,
     DoubleVar
 )
-from tkcalendar import Calendar
 #import cv2
 from PIL import Image, ImageTk
 import time
 from threading import Thread, enumerate
-from pandas import DataFrame
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import vlc
 
 #Import yolo library
 import time
@@ -34,13 +31,11 @@ physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 import core.utils as utils
-from core.yolov4 import filter_boxes
 from tensorflow.python.saved_model import tag_constants
 from PIL import Image
 import cv2
 import numpy as np
 from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
 
 #GUI
 OUTPUT_PATH = Path(__file__).parent
@@ -165,8 +160,6 @@ class MainWindow(Toplevel):
         self.current_window.tkraise()
         self.resizable(False, False)
         
-        print("Step 1 - Done")
-        
         self.mainloop()
     
     def handle_btn_press(self, caller, name):
@@ -187,15 +180,19 @@ class MainWindow(Toplevel):
         self.windows['dashboard'] = Dashboard(self)
 
     def update(self, img = None):
-        print('Updating image')
         self.photo = ImageTk.PhotoImage(image = Image.fromarray(img).resize((854,480)))
         self.camera.configure(image = self.photo)
         self.camera.image = self.photo
-        print('Image updated')
     
     def alarmSound(self):
         if(not self.alarmOn):
-            return "Make alarm sound"
+            self.alarmOn = True
+            media_player = vlc.MediaPlayer()
+            media = vlc.Media('./data/alarm.wav')
+            media_player.set_media(media)
+            media_player.play()
+            time.sleep(3)
+            self.alarmOn = False
     
     def main(self):
         config = ConfigProto()
@@ -209,7 +206,7 @@ class MainWindow(Toplevel):
         except:
             vid = cv2.VideoCapture(video_path)
 
-        saved_model_loaded = tf.saved_model.load("./checkpoints/yolov4-monitor-best", tags=[tag_constants.SERVING])
+        saved_model_loaded = tf.saved_model.load("./checkpoints/yolov4-monitor_best", tags=[tag_constants.SERVING])
         infer = saved_model_loaded.signatures['serving_default']
 
         frame_id = 0
@@ -217,7 +214,7 @@ class MainWindow(Toplevel):
         #Change begin
         self.visitor = Visitor('visitorLog.json', vertical = True, x = 300)
         forbiden_class = [0,1,4,5]
-            #Start video by refreshing video
+        forbiden_content = ['帶水瓶','帶鋁罐','無口罩','口罩未戴好']
         #Change end
 
         while True:
@@ -259,9 +256,9 @@ class MainWindow(Toplevel):
             for i in range(50):
                 if (pred_bbox[1][0][i] >= 0.45 and pred_bbox[2][0][i] in forbiden_class):
                     #If forbidden object detected, make alarm ring
-                    self.alarmSound()
+                    Thread(target = self.alarmSound, args = ()).start()
                     #Save the screenshot of the scene
-                    filename = time.strftime('%Y-%m-%d %H-%M-%S', time.localtime(time.time())) + "_" + "TheContent"
+                    filename = time.strftime('%Y-s-%m-s-%d %H-c-%M-c-%S', time.localtime(time.time())) + "_" + forbiden_content[forbiden_class.index(pred_bbox[2][0][i])]
                     filepath = "./screenshot/" + filename
                     self.windows["dashboard"].save_screenshot(image, filepath)
             #Change end
@@ -269,9 +266,7 @@ class MainWindow(Toplevel):
             curr_time = time.time()
             exec_time = curr_time - prev_time
             info = "time: %.2f ms" %(1000*exec_time)
-            print(info)
-            print(self.windows)
-
+            
             self.update(img = image)
 
 if __name__ == '__main__':
