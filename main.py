@@ -69,6 +69,8 @@ class MainWindow(Toplevel):
         
         self.camera = None
         
+        self.visitor = Visitor('visitorLog.json', vertical = True, x = 300)
+        
         #Main window canvas
         self.canvas = Canvas(
             self,
@@ -143,7 +145,7 @@ class MainWindow(Toplevel):
         self.maskValue = IntVar()
         self.forbiddenValue = IntVar()
         self.visitorValue = IntVar()
-        self.volumeValue = DoubleVar()
+        self.volumeValue = IntVar()
         
         #Loop through windows and place them
         self.windows = {
@@ -180,7 +182,7 @@ class MainWindow(Toplevel):
         self.windows['dashboard'] = Dashboard(self)
 
     def update(self, img = None):
-        self.photo = ImageTk.PhotoImage(image = Image.fromarray(img).resize((854,480)))
+        self.photo = ImageTk.PhotoImage(image = Image.fromarray(img).resize((864,480)))
         self.camera.configure(image = self.photo)
         self.camera.image = self.photo
     
@@ -190,6 +192,7 @@ class MainWindow(Toplevel):
             media_player = vlc.MediaPlayer()
             media = vlc.Media('./data/alarm.wav')
             media_player.set_media(media)
+            media_player.audio_set_volume(self.volumeValue.get())
             media_player.play()
             time.sleep(3)
             self.alarmOn = False
@@ -212,7 +215,6 @@ class MainWindow(Toplevel):
         frame_id = 0
 
         #Change begin
-        self.visitor = Visitor('visitorLog.json', vertical = True, x = 300)
         forbiden_class = [0,1,4,5]
         forbiden_content = ['帶水瓶','帶鋁罐','無口罩','口罩未戴好']
         #Change end
@@ -231,7 +233,6 @@ class MainWindow(Toplevel):
             image_data = cv2.resize(frame, (input_size, input_size))
             image_data = image_data / 255.
             image_data = image_data[np.newaxis, ...].astype(np.float32)
-            prev_time = time.time()
 
             batch_data = tf.constant(image_data)
             pred_bbox = infer(batch_data)
@@ -253,7 +254,10 @@ class MainWindow(Toplevel):
 
             #Change begin
                 #Detect forbidden object
+            bbox_coordinate = []
+            
             for i in range(50):
+                #Detect illegal object
                 if (pred_bbox[1][0][i] >= 0.45 and pred_bbox[2][0][i] in forbiden_class):
                     #If forbidden object detected, make alarm ring
                     Thread(target = self.alarmSound, args = ()).start()
@@ -261,12 +265,15 @@ class MainWindow(Toplevel):
                     filename = time.strftime('%Y-s-%m-s-%d %H-c-%M-c-%S', time.localtime(time.time())) + "_" + forbiden_content[forbiden_class.index(pred_bbox[2][0][i])]
                     filepath = "./screenshot/" + filename
                     self.windows["dashboard"].save_screenshot(image, filepath)
+                #Detect person for visitor feature
+                if (pred_bbox[1][0][i] >= 0.45 and pred_bbox[2][0][i] == 2):
+                    bbox_coordinate.append([(pred_bbox[0][0][i][1]+pred_bbox[0][0][i][3])/2])
+                    if len(bbox_coordinate) > 0 and self.visitor.check(bbox_coordinate):
+                        self.windows['dashboard'].refresh_visitor()              
+                    print(bbox_coordinate) 
+                    
             #Change end
-
-            curr_time = time.time()
-            exec_time = curr_time - prev_time
-            info = "time: %.2f ms" %(1000*exec_time)
-            
+            self.visitor.old_pred = bbox_coordinate        
             self.update(img = image)
 
 if __name__ == '__main__':

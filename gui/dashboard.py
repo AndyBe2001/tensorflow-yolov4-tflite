@@ -70,8 +70,9 @@ class Dashboard(Frame):
         self.canvas.camera_bg_image = PhotoImage(file=relative_to_assets('image_1.png'))
         self.canvas.create_image(29.665,0,image = self.canvas.camera_bg_image,anchor='nw')
         
-        self.parent.camera = Label(self.canvas, image = ImageTk.PhotoImage(Image.open(relative_to_assets('image_1.png')).resize((854,480))))
-        self.parent.camera.place(x=585,y=240, anchor='center')
+        self.camera_loading_image = ImageTk.PhotoImage(Image.open(relative_to_assets('image_12.png')))
+        self.parent.camera = Label(self.canvas, image = self.camera_loading_image)
+        self.parent.camera.place(x=594.165,y=240, anchor='center')
         
         #Place the visitor information
         self.canvas.visitor_bg_image = PhotoImage(file=relative_to_assets('image_2.png'))
@@ -96,40 +97,40 @@ class Dashboard(Frame):
             justify="right",
         )
         try:
-            self.canvas.create_text(
-                120,
-                580,
-                anchor='nw',
+            self.insideInfo  = self.canvas.create_text(
+                130,
+                610,
+                anchor='center',
                 text=str(self.parent.visitor.inside),
                 fill='#000000',
                 font=('Arial', 53 * -1),
                 justify="center",
             )
         except:
-            self.canvas.create_text(
-                120,
-                580,
-                anchor='nw',
+            self.insideInfo  = self.canvas.create_text(
+                130,
+                610,
+                anchor='center',
                 text='0',
                 fill='#000000',
                 font=('Arial', 53 * -1),
                 justify="center",
             )
         try:
-            self.canvas.create_text(
+            self.todayInfo  = self.canvas.create_text(
                 320,
-                580,
-                anchor='nw',
+                610,
+                anchor='center',
                 text=str(self.parent.visitor.today),
                 fill='#000000',
                 font=('Arial', 53 * -1),
                 justify="center",
             )
         except:
-            self.canvas.create_text(
+            self.todayInfo  = self.canvas.create_text(
                 320,
-                580,
-                anchor='nw',
+                610,
+                anchor='center',
                 text='0',
                 fill='#000000',
                 font=('Arial', 53 * -1),
@@ -139,7 +140,8 @@ class Dashboard(Frame):
         self.refresh_screenshot()
        
     def refresh_visitor(self):
-        pass
+        self.canvas.itemconfig(self.insideInfo, text=str(self.parent.visitor.inside))
+        self.canvas.itemconfig(self.todayInfo, text=str(self.parent.visitor.today))
      
     def wait_next_capture(self):
         time.sleep(3)
@@ -241,7 +243,7 @@ class Dashboard(Frame):
                 cursor='hand2', activebackground='#FFFFFF',
                 relief='flat',
             )
-            screenshot_open_btn.place(x=550,y=23+(count*40), width=62.67, height=27.33)
+            screenshot_open_btn.place(x=580,y=23+(count*40), width=62.67, height=27.33)
             #Putting the close screenshot button
             screenshot_close_btn = Button(
                 self.screenshot_canvas,

@@ -32,6 +32,8 @@ class Visitor:
 		#Create a time index
 		self.currentHourIndex = int(time.time()/(60*60))
 		self.currentDayIndex = int(self.currentHourIndex/24)
+		print("Current hour : " + str(self.currentHourIndex))
+		print('Current day : ' + str(self.currentDayIndex))
 		#Loading data
 		try: #If the visitor data exist
 			with open(self.dataUrl,'r') as file:
@@ -44,11 +46,13 @@ class Visitor:
 				self.inside = 0
 			#Count the number of visitor entered today
 			self.today = 0
-			for i in range(24):
-				try:
+			try:
+				for i in range(24):
 					self.today = self.today + self.record[str(self.currentDayIndex)][i]
-				except:
-					continue
+			except:
+				self.record[str(self.currentDayIndex)]=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+				with open(self.dataUrl,'w') as file:
+					file.write(json.dumps(self.record))
 		except :
 			self.record = {
     			'inside':[self.currentDayIndex,0],
@@ -61,7 +65,9 @@ class Visitor:
 		#Store the prediction value
 		self.old_pred = None
 
-
+	def getVisitorInfo(self, dayIndex):
+		return self.record[str(dayIndex)]
+     
 	def enter(self):
 		#Get actual time data
 		self.updateTime()
@@ -70,10 +76,10 @@ class Visitor:
 		self.today = self.today + 1
 		self.record['inside'] = [self.currentDayIndex,self.inside]
 		try:
-			self.record[str(self.currentDayIndex)][str(self.currentHourIndex-(self.currentDayIndex*24))] = self.record[str(self.currentDayIndex)][str(self.currentHourIndex-(self.currentDayIndex*24))] + 1
+			self.record[str(self.currentDayIndex)][(self.currentHourIndex-(self.currentDayIndex*24))] = self.record[str(self.currentDayIndex)][(self.currentHourIndex-(self.currentDayIndex*24))] + 1
 		except:
 			self.record[str(self.currentDayIndex)] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-			self.record[str(self.currentDayIndex)][str(self.currentHourIndex-(self.currentDayIndex*24))] = self.record[str(self.currentDayIndex)][str(self.currentHourIndex-(self.currentDayIndex*24))] + 1
+			self.record[str(self.currentDayIndex)][(self.currentHourIndex-(self.currentDayIndex*24))] = self.record[str(self.currentDayIndex)][(self.currentHourIndex-(self.currentDayIndex*24))] + 1
 		#Save data
 		with open(self.dataUrl,'w') as file:
 			file.write(json.dumps(self.record))
@@ -93,7 +99,7 @@ class Visitor:
 	def gline(self, y):
 		return (y-self.b)/self.a
 
-	def check(self, prediction):
+	def check(self, bbox_coordinate):
 		'''
 		pred_bbox = [boxes.numpy(), scores.numpy(), classes.numpy(), valid_detections.numpy()]
 			boxes = [[[x1,y1,x2,y2],[x1,y1,x2,y2],...,[x1,y1,x2,y2]]]
@@ -116,67 +122,60 @@ class Visitor:
 			x1 < gline(y1) and y1 > fline(x1)
 			x2 > gline(y2) and y2 < fline(x2)
   		'''
+		entering = False
+		exiting = False
+  
+		if (self.old_pred == None):
+			return False
+		for j in range(len(self.old_pred)):
+			if len(bbox_coordinate)==0:
+				break
+			if abs(bbox_coordinate[len(bbox_coordinate)-1][0]-self.old_pred[j][0]) < 25:
+				if (self.old_pred[j][0] < self.x and bbox_coordinate[len(bbox_coordinate)-1][0] >= self.x):
+					entering = True
+				elif (self.old_pred[j][0] > self.x and bbox_coordinate[len(bbox_coordinate)-1][0] <= self.x):
+					exiting = True
 
-		if(self.old_pred == None):
-			return (0,0)
-		else:
-			bbox_coordinate = []
-   
-			for i in range(50):
-				if (prediction[1][0][i] < 0.45 and prediction[2][0][i] == 2):
-					continue
-				bbox_coordinate.append([(prediction[0][0][0][i][0]+prediction[0][0][0][i][2])/2])
-				#bbox_coordinate.append([(prediction[0][0][0][i][0]+prediction[0][0][0][i][2])/2,(prediction[0][0][0][i][1]+prediction[0][0][0][i][3])/2])
-				
-				entering = False
-				exiting = False
-    
-				for j in range(len(self.old_pred)):
-					if math.abs(bbox_coordinate[i][0]-self.old_pred[j][0]) < 0.02:
-						if (self.old_pred[j][0] < self.x and bbox_coordinate >= self.x):
+				'''
+			if math.abs(bbox_coordinate[i][0]-self.old_pred[j][0])+math.abs(bbox_coordinate[i][1]-self.old_pred[j][1]) < 0.02 :
+				if self.vertical:
+					if self.direction == False:
+						if (self.old_pred[j][0] < self.x and 
+							bbox_coordinate >= self.x):
 							entering = True
-						elif (self.old_pred[j][0] > self.x and bbox_coordinate <= self.x):
+				elif self.a < 0:
+					if self.direction == False:
+						if (self.old_pred[j][0] < self.gline(self.old_pred[j][1]) and
+							self.old_pred[j][1] < self.fline(self.old_pred[j][0]) and
+							bbox_coordinate[i][0] > self.gline(bbox_coordinate[i][1]) and
+							bbox_coordinate[i][1] > self.fline(bbox_coordinate[i][0])
+							):
+							entering = True
 							exiting = True
+				elif self.a == 0:
+					if self.direction == False:
+						if (self.old_pred[j][1] < self.fline(self.old_pred[j][0]) and
+							bbox_coordinate[i][1] > self.fline(bbox_coordinate[i][0])):
+							entering = True
+				elif self.a > 0:
+					if (self.old_pred[j][0] < self.gline(self.old_pred[j][1]) and 
+						self.old_pred[j][1] > self.fline(self.old_pred[j][0]) and
+						bbox_coordinate[i][0] > self.gline(bbox_coordinate[i][1]) and
+						bbox_coordinate[i][1] < self.fline(bbox_coordinate[i][0])):
+						if self.direction == False:
+							entering = True
+						else:
+							exiting = True
+				'''
+			
+			if entering:
+				self.enter()
+			if exiting:
+				self.exit()
 
-						'''
-					if math.abs(bbox_coordinate[i][0]-self.old_pred[j][0])+math.abs(bbox_coordinate[i][1]-self.old_pred[j][1]) < 0.02 :
-     					if self.vertical:
-							if self.direction == False:
-								if (self.old_pred[j][0] < self.x and 
-									bbox_coordinate >= self.x):
-									entering = True
-						elif self.a < 0:
-							if self.direction == False:
-								if (self.old_pred[j][0] < self.gline(self.old_pred[j][1]) and
-									self.old_pred[j][1] < self.fline(self.old_pred[j][0]) and
-									bbox_coordinate[i][0] > self.gline(bbox_coordinate[i][1]) and
-									bbox_coordinate[i][1] > self.fline(bbox_coordinate[i][0])
-									):
-									entering = True
-									exiting = True
-						elif self.a == 0:
-							if self.direction == False:
-								if (self.old_pred[j][1] < self.fline(self.old_pred[j][0]) and
-									bbox_coordinate[i][1] > self.fline(bbox_coordinate[i][0])):
-									entering = True
-						elif self.a > 0:
-							if (self.old_pred[j][0] < self.gline(self.old_pred[j][1]) and 
-           						self.old_pred[j][1] > self.fline(self.old_pred[j][0]) and
-                 				bbox_coordinate[i][0] > self.gline(bbox_coordinate[i][1]) and
-                     			bbox_coordinate[i][1] < self.fline(bbox_coordinate[i][0])):
-								if self.direction == False:
-									entering = True
-								else:
-									exiting = True
-						'''
-					
-					if entering:
-						self.enter()
-					if exiting:
-						self.exit()
-      
-		self.old_pred = bbox_coordinate
-		return (self.today, self.inside)
+		if entering or exiting:
+			return True
+		return False
 			
 
 	def updateTime(self):
